@@ -51,8 +51,8 @@ c     in the cif file.
       real(8) time,ftime,etime
     
       double precision delta_dist(n_dim), delta_fdist(n_dim),dist,
-     &grid_pos_frac(n_dim),DO_FACTOR
-      parameter(DO_FACTOR=1.0)
+     &grid_pos_frac(n_dim),DO_FACTOR,do_fb
+      parameter(DO_FACTOR=1.5)
       character(len=100) :: cube1,cube2
       save record,atom,atmname,rootname
       save atom_number,atom_index
@@ -79,7 +79,7 @@ c     get filenames from command line
      & grid points!"
           stop
       end if
-
+      do_fb = DO_FACTOR*angs2bohr
       n_atoms = n_atoms1
       ngx = ngx1
       ngy = ngy1
@@ -105,7 +105,7 @@ c     get filenames from command line
             V_pot2(i,j,k)=0.d0
             V_diff(i,j,k)=0.d0
             V_flag(i,j,k)=1
-            if(DO_FACTOR.ne.0)then
+            if(do_fb.ne.0)then
               ! flag if not to compute ESP at this grid point
               grid_pos_frac(1) = dble(i-1)/dble(ngx)
               grid_pos_frac(2) = dble(j-1)/dble(ngy)
@@ -132,7 +132,8 @@ c     get filenames from command line
                 end do
                 ! check for nearby atoms
                 dist = sqrt(dist)
-                if(dist.le.(vdw_radii(i_atom)+DO_FACTOR))then
+                if(dist.le.
+     &(vdw_radii(i_atom)+do_fb))then
                   V_flag(i,j,k)=0
                 endif
               end do
@@ -163,13 +164,15 @@ c     get filenames from command line
             diff2 = diff*diff
             V_diff(i,j,k) = diff
             SSE = SSE+diff2
-            MAD = MAD + diff
+            MAD = MAD + abs(diff)
             ngpt = ngpt + 1
           endif
         end do 
        end do
       end do
-
+      if(ngpt.eq.0)then
+        ngpt=1
+      endif
       call timchk(1,etime)
 
       call timchk(0,ftime)
@@ -177,12 +180,12 @@ c     get filenames from command line
 
       call timchk(1,ftime)
       call timchk(1,time)
-
-      write(*,'(a,f20.5)')"Total Sum Sq. Error :",SSE
-      write(*,'(a,f20.5)')"Total Mean Abs. Dev.:",MAD/dble(ngpt)
-      write(*,'(a,f20.5,a)')"ESP comparison time :",etime," seconds."
-      write(*,'(a,f20.5,a)')"File writing time   :",ftime," seconds."
-      write(*,'(a,f20.5,a)')"Total wall time     :",time," seconds."
+      write(*,'(f20.5,a,f20.5)')SSE,",",MAD/dble(ngpt)
+      !write(*,'(a,f20.5)')"Total Sum Sq. Error :",SSE
+      !write(*,'(a,f20.5)')"Total Mean Abs. Dev.:",MAD/dble(ngpt)
+      !write(*,'(a,f20.5,a)')"ESP comparison time :",etime," seconds."
+      !write(*,'(a,f20.5,a)')"File writing time   :",ftime," seconds."
+      !write(*,'(a,f20.5,a)')"Total wall time     :",time," seconds."
       contains 
       
       subroutine writecube(ind,V_pot,n_atoms,ngx,ngy,ngz)
