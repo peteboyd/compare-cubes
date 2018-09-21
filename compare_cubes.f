@@ -170,17 +170,19 @@ c     get filenames from command line
         end do 
        end do
       end do
-      if(ngpt.eq.0)then
-        ngpt=1
-      endif
       call timchk(1,etime)
 
       call timchk(0,ftime)
+      if(ngpt.eq.0)then
+        ngpt=1
+      endif
       call writecube(ind,V_diff,n_atoms,ngx,ngy,ngz)
 
       call timchk(1,ftime)
       call timchk(1,time)
-      write(*,'(f20.5,a,f20.5)')SSE,",",MAD/dble(ngpt)
+      write(*,'(20a,a)',advance='no')rootname(1:ind),","
+      write(*,'(i20,a,f20.5,a,f20.5)')
+     &ngpt,",",SSE,",",MAD/dble(ngpt)
       !write(*,'(a,f20.5)')"Total Sum Sq. Error :",SSE
       !write(*,'(a,f20.5)')"Total Mean Abs. Dev.:",MAD/dble(ngpt)
       !write(*,'(a,f20.5,a)')"ESP comparison time :",etime," seconds."
@@ -1252,18 +1254,24 @@ c     gather the filename before the .cube
 c     this will enable the writing of other output files
 c*********************************************************************
       implicit none
-      integer i,ind
+      integer icount,i,start,ind
       character*100 cubefile
-
+      start=0
+      icount=0
       do i=1,100
+        if(cubefile(i:i).eq.'/')then
+           start=i+1
+        endif
         if(cubefile(i:i+4).eq.'.cube')then
            ind=i-1
         endif
       enddo
-      allocate(rootname(ind))
-      do i=1,ind
-        rootname(i)=cubefile(i:i)
+      allocate(rootname(ind-start))
+      do i=start,ind
+        icount=icount+1
+        rootname(icount)=cubefile(i:i)
       enddo
+      ind = icount
       return
       end subroutine getroot
 
