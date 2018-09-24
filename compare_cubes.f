@@ -52,6 +52,7 @@ c     in the cif file.
     
       double precision delta_dist(n_dim), delta_fdist(n_dim),dist,
      &grid_pos_frac(n_dim),DO_FACTOR,do_fb
+      !parameter(DO_FACTOR=1.d-5)
       parameter(DO_FACTOR=1.5)
       character(len=100) :: cube1,cube2
       save record,atom,atmname,rootname
@@ -70,7 +71,14 @@ c     get filenames from command line
       call getarg(2, cube2)
 
       call scancube(ncube,cube1,n_atoms1,ngx1,ngy1,ngz1)
-      call scancube(ncube,cube2,n_atoms2,ngx2,ngy2,ngz2)
+      if(cube2.eq.'0')then
+        n_atoms2 = n_atoms1
+        ngx2 = ngx1
+        ngy2 = ngy1
+        ngz2 = ngz1
+      else
+        call scancube(ncube,cube2,n_atoms2,ngx2,ngy2,ngz2)
+      endif
       if(n_atoms1.ne.n_atoms2)then
           write(*,*)"ERROR - the cube file atom counts don't match!"
           stop
@@ -143,7 +151,9 @@ c     get filenames from command line
         enddo
       enddo
       call readcube(ncube,cube1,n_atoms,V_pot1,ngx,ngy,ngz)
-      call readcube(ncube,cube2,n_atoms,V_pot2,ngx,ngy,ngz)
+      if(cube2.ne.'0')then
+        call readcube(ncube,cube2,n_atoms,V_pot2,ngx,ngy,ngz)
+      endif
       
       call getroot(cube1,ind)
       call timchk(0,etime)
@@ -157,6 +167,7 @@ c     get filenames from command line
       do i=1, ngx
        do j=1, ngy
         do k=1, ngz
+          ! also include a '0' chg comparison.. just the V_pot1 - 0.
           if(V_flag(i,j,k).eq.1)then
             Phi_sum1 = Phi_sum1 + V_pot1(i,j,k) 
             Phi_sum2 = Phi_sum2 + V_pot2(i,j,k)
@@ -174,7 +185,7 @@ c     get filenames from command line
 
       call timchk(0,ftime)
       if(ngpt.eq.0)then
-        ngpt=1
+        ngpt=-1
       endif
       call writecube(ind,V_diff,n_atoms,ngx,ngy,ngz)
 
