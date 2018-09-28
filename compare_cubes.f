@@ -172,8 +172,10 @@ c     get filenames from command line
             Phi_sum1 = Phi_sum1 + V_pot1(i,j,k) 
             Phi_sum2 = Phi_sum2 + V_pot2(i,j,k)
             diff = V_pot1(i,j,k) - V_pot2(i,j,k)
+            !write(*,*)V_pot1(i,j,k),V_pot2(i,j,k)
             diff2 = diff*diff
             V_diff(i,j,k) = diff
+            !V_diff(i,j,k) = 5.d0
             SSE = SSE+diff2
             MAD = MAD + abs(diff)
             ngpt = ngpt + 1
