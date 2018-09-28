@@ -2,7 +2,7 @@
       implicit none
 !-----General parameters
       integer n_dim, n_atoms_max, n_atoms_type_max 
-       parameter(n_dim=3,n_atoms_max=5000,n_atoms_type_max=171)
+      parameter(n_dim=3,n_atoms_max=5000,n_atoms_type_max=171)
 
       integer n_atoms1,ngx1,ngy1,ngz1,
      & n_atoms2,ngx2,ngy2,ngz2,
@@ -585,6 +585,147 @@ c***********************************************************************
       return
       end function dblstr
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!-----Subroutine to deal with the simulation box and atomic variables
+!-----according to the PBCs    
+      subroutine process_box(n_atoms,ngx,ngy,ngz)
+      implicit none
+      integer i_dim, j_dim, i_atom, ngx, ngy, ngz, n_atoms
+
+      double precision a(n_dim), b(n_dim), c(n_dim), ab(n_dim),
+     & r(n_dim), cross_tmp(n_dim), signo, dot_1,
+     & cross_tmp_1(n_dim), Box_volume, dot
+
+!-----Creating the real space box
+      real_box_vector(1,1:n_dim) = ngx*axis_vector(1,1:n_dim)
+      real_box_vector(2,1:n_dim) = ngy*axis_vector(2,1:n_dim)
+      real_box_vector(3,1:n_dim) = ngz*axis_vector(3,1:n_dim)
+      a(1) = real_box_vector(1,1)
+      a(2) = real_box_vector(1,2)
+      a(3) = real_box_vector(1,3)
+      b(1) = real_box_vector(2,1)
+      b(2) = real_box_vector(2,2)
+      b(3) = real_box_vector(2,3)
+      c(1) = real_box_vector(3,1)
+      c(2) = real_box_vector(3,2)
+      c(3) = real_box_vector(3,3)
+
+      call Vect_Cross(b,c,ab)
+      Box_volume = Vect_Dot(a,ab)
+      !write(*,*) "Real box volume ", Box_volume
+
+!-----Creating the reciprocal space box
+      call Vect_Cross(a,b,ab)
+      do i_dim=1, n_dim
+       recip_box_vector(3,i_dim) = (1.d0/Box_volume)*ab(i_dim)
+      end do
+      call Vect_Cross(c,a,ab)
+      do i_dim=1, n_dim
+       recip_box_vector(2,i_dim) = (1.d0/Box_volume)*ab(i_dim)
+      end do
+      call Vect_Cross(b,c,ab)
+      do i_dim=1, n_dim
+       recip_box_vector(1,i_dim) = (1.d0/Box_volume)*ab(i_dim)
+      end do
+!-----Setting the origin of the real box to (0,0,0) 
+      do i_atom=1, n_atoms
+       do i_dim=1, n_dim
+        atom_pos(i_atom,i_dim) =
+     &  atom_pos(i_atom,i_dim) - axis_zero(i_dim)
+        r(i_dim) = atom_pos(i_atom,i_dim)
+       end do
+!------Including the atoms within the box (applying pbc's)       
+       call Vect_Cross(r,b,cross_tmp)
+       dot = Vect_Dot(c,cross_tmp)
+       call Vect_Cross(a,b,cross_tmp_1)
+       dot_1 = Vect_Dot(c,cross_tmp_1)
+       signo = dot/dot_1
+       if(signo.lt.0) then
+        do i_dim=1, n_dim
+         atom_pos(i_atom,i_dim) =
+     &   atom_pos(i_atom,i_dim) + a(i_dim)
+        end do
+       else if(signo.gt.1) then
+        do i_dim=1, n_dim
+         atom_pos(i_atom,i_dim) =
+     &   atom_pos(i_atom,i_dim) - a(i_dim)
+        end do
+       end if
+
+       call Vect_Cross(r,c,cross_tmp)
+       dot = Vect_Dot(a,cross_tmp)
+       call Vect_Cross(b,c,cross_tmp_1)
+       dot_1 = Vect_Dot(a,cross_tmp_1)
+       signo = dot/dot_1
+       if(signo.lt.0) then
+        do i_dim=1, n_dim
+         atom_pos(i_atom,i_dim) =
+     &   atom_pos(i_atom,i_dim) + b(i_dim)
+        end do
+       else if(signo.gt.1) then
+        do i_dim=1, n_dim
+         atom_pos(i_atom,i_dim) =
+     &   atom_pos(i_atom,i_dim) - b(i_dim)
+        end do
+       end if
+
+       call Vect_Cross(r,a,cross_tmp)
+       dot=Vect_Dot(b,cross_tmp)
+       call Vect_Cross(c,a,cross_tmp_1)
+       dot_1 = Vect_Dot(b,cross_tmp_1)
+       signo = dot/dot_1
+       if(signo.lt.0) then
+        do i_dim=1, n_dim
+         atom_pos(i_atom,i_dim) =
+     &   atom_pos(i_atom,i_dim) + c(i_dim)
+        end do
+       else if(signo.gt.1) then
+        do i_dim=1, n_dim
+         atom_pos(i_atom,i_dim) =
+     &   atom_pos(i_atom,i_dim) - c(i_dim)
+        end do
+       end if
+
+       atom_pos_frac(i_atom,1) = 
+     &atom_pos(i_atom,1)*recip_box_vector(1,1) + 
+     &atom_pos(i_atom,2)*recip_box_vector(2,1) + 
+     &atom_pos(i_atom,3)*recip_box_vector(3,1)
+       atom_pos_frac(i_atom,2) = 
+     &atom_pos(i_atom,1)*recip_box_vector(1,2) + 
+     &atom_pos(i_atom,2)*recip_box_vector(2,2) + 
+     &atom_pos(i_atom,3)*recip_box_vector(3,2)
+       atom_pos_frac(i_atom,3) = 
+     &atom_pos(i_atom,1)*recip_box_vector(1,3) + 
+     &atom_pos(i_atom,2)*recip_box_vector(2,3) + 
+     &atom_pos(i_atom,3)*recip_box_vector(3,3)
+      end do
+
+      end subroutine
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!-----Subroutine to compute the cross product of two vectors
+      Subroutine Vect_Cross(v1,v2,v3)
+      Implicit NONE
+
+      double precision v1(3),v2(3),v3(3)
+
+      v3(1)=v1(2)*v2(3)-v1(3)*v2(2)
+      v3(2)=v1(3)*v2(1)-v1(1)*v2(3)
+      v3(3)=v1(1)*v2(2)-v1(2)*v2(1)
+      
+      End subroutine
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!-----Function to compute the dot product of two vectors
+
+      function Vect_Dot(a,b)
+      Implicit NONE
+
+      double precision a(3),b(3),Vect_Dot
+
+      Vect_Dot=a(1)*b(1)+a(2)*b(2)+a(3)*b(3)
+      
+      end function
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   
       subroutine scancube(ncube,cubefile,n_atoms,ngx,ngy,ngz)
@@ -1288,149 +1429,6 @@ c*********************************************************************
       return
       end subroutine getroot
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!-----Subroutine to deal with the simulation box and atomic variables
-!-----according to the PBCs    
-      subroutine process_box(n_atoms,ngx,ngy,ngz)
-      implicit none
-      integer i_dim, j_dim, i_atom, ngx, ngy, ngz, n_atoms
-
-      double precision a(n_dim), b(n_dim), c(n_dim), ab(n_dim),
-     & r(n_dim), cross_tmp(n_dim), signo, dot, dot_1,
-     & cross_tmp_1(n_dim), Box_volume
-
-!-----Creating the real space box
-      real_box_vector(1,1:n_dim) = ngx*axis_vector(1,1:n_dim)
-      real_box_vector(2,1:n_dim) = ngy*axis_vector(2,1:n_dim)
-      real_box_vector(3,1:n_dim) = ngz*axis_vector(3,1:n_dim)
-
-      a(1) = real_box_vector(1,1)
-      a(2) = real_box_vector(1,2)
-      a(3) = real_box_vector(1,3)
-      b(1) = real_box_vector(2,1)
-      b(2) = real_box_vector(2,2)
-      b(3) = real_box_vector(2,3)
-      c(1) = real_box_vector(3,1)
-      c(2) = real_box_vector(3,2)
-      c(3) = real_box_vector(3,3)
-
-      call Vect_Cross(b,c,ab)
-      call Vect_Dot(a,ab,Box_volume) 
-      !write(*,*) "Real box volume ", Box_volume
-
-!-----Creating the reciprocal space box
-      call Vect_Cross(a,b,ab)
-      do i_dim=1, n_dim
-       recip_box_vector(3,i_dim) = (2*pi/Box_volume)*ab(i_dim)
-      end do
-      call Vect_Cross(c,a,ab)
-      do i_dim=1, n_dim
-       recip_box_vector(2,i_dim) = (2*pi/Box_volume)*ab(i_dim)
-      end do
-      call Vect_Cross(b,c,ab)
-      do i_dim=1, n_dim
-       recip_box_vector(1,i_dim) = (2*pi/Box_volume)*ab(i_dim)
-      end do
-
-!-----Setting the origin of the real box to (0,0,0) 
-      do i_atom=1, n_atoms
-       do i_dim=1, n_dim
-        atom_pos(i_atom,i_dim) =
-     &  atom_pos(i_atom,i_dim) - axis_zero(i_dim)
-        r(i_dim) = atom_pos(i_atom,i_dim)
-       end do
-!------Including the atoms within the box (applying pbc's)       
-       call Vect_Cross(r,b,cross_tmp)
-       call Vect_Dot(c,cross_tmp,dot)
-       call Vect_Cross(a,b,cross_tmp_1)
-       call Vect_Dot(c,cross_tmp_1,dot_1)
-       signo = dot/dot_1
-       if(signo.lt.0) then
-        do i_dim=1, n_dim
-         atom_pos(i_atom,i_dim) =
-     &   atom_pos(i_atom,i_dim) + a(i_dim)
-        end do
-       else if(signo.gt.1) then
-        do i_dim=1, n_dim
-         atom_pos(i_atom,i_dim) =
-     &   atom_pos(i_atom,i_dim) - a(i_dim)
-        end do
-       end if
-
-       call Vect_Cross(r,c,cross_tmp)
-       call Vect_Dot(a,cross_tmp,dot)
-       call Vect_Cross(b,c,cross_tmp_1)
-       call Vect_Dot(a,cross_tmp_1,dot_1)
-       signo = dot/dot_1
-       if(signo.lt.0) then
-        do i_dim=1, n_dim
-         atom_pos(i_atom,i_dim) =
-     &   atom_pos(i_atom,i_dim) + b(i_dim)
-        end do
-       else if(signo.gt.1) then
-        do i_dim=1, n_dim
-         atom_pos(i_atom,i_dim) =
-     &   atom_pos(i_atom,i_dim) - b(i_dim)
-        end do
-       end if
-
-       call Vect_Cross(r,a,cross_tmp)
-       call Vect_Dot(b,cross_tmp, dot)
-       call Vect_Cross(c,a,cross_tmp_1)
-       call Vect_Dot(b,cross_tmp_1,dot_1)
-       signo = dot/dot_1
-       if(signo.lt.0) then
-        do i_dim=1, n_dim
-         atom_pos(i_atom,i_dim) =
-     &   atom_pos(i_atom,i_dim) + c(i_dim)
-        end do
-       else if(signo.gt.1) then
-        do i_dim=1, n_dim
-         atom_pos(i_atom,i_dim) =
-     &   atom_pos(i_atom,i_dim) - c(i_dim)
-        end do
-       end if
-
-       atom_pos_frac(i_atom,1) = 
-     &atom_pos(i_atom,1)*recip_box_vector(1,1) + 
-     &atom_pos(i_atom,2)*recip_box_vector(2,1) + 
-     &atom_pos(i_atom,3)*recip_box_vector(3,1)
-       atom_pos_frac(i_atom,2) = 
-     &atom_pos(i_atom,1)*recip_box_vector(1,2) + 
-     &atom_pos(i_atom,2)*recip_box_vector(2,2) + 
-     &atom_pos(i_atom,3)*recip_box_vector(3,2)
-       atom_pos_frac(i_atom,3) = 
-     &atom_pos(i_atom,1)*recip_box_vector(1,3) + 
-     &atom_pos(i_atom,2)*recip_box_vector(2,3) + 
-     &atom_pos(i_atom,3)*recip_box_vector(3,3)
-      end do
-
-      end subroutine
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!-----Subroutine to compute the cross product of two vectors
-      Subroutine Vect_Cross(v1,v2,v3)
-      Implicit NONE
-
-      double precision v1(3),v2(3),v3(3)
-
-      v3(1)=v1(2)*v2(3)-v1(3)*v2(2)
-      v3(2)=v1(3)*v2(1)-v1(1)*v2(3)
-      v3(3)=v1(1)*v2(2)-v1(2)*v2(1)
-      
-      End subroutine
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!-----Function to compute the dot product of two vectors
-      subroutine Vect_Dot(a,b,dot)
-      Implicit NONE
-
-      double precision a(3),b(3),dot
-
-      dot=a(1)*b(1)+a(2)*b(2)+a(3)*b(3)
-      
-      end subroutine Vect_Dot
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !-----Subroutine that assigns the van der Waals radii for the
 !-----elements found in the cube file according to the UFF tabulation 
@@ -1560,4 +1558,3 @@ c   END OF PROGRAM
 c######################################################################
 
       end program 
-
