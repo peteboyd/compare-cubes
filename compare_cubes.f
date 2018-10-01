@@ -52,8 +52,8 @@ c     in the cif file.
     
       double precision delta_dist(n_dim), delta_fdist(n_dim),dist,
      &grid_pos_frac(n_dim),DO_FACTOR,do_fb
-      !parameter(DO_FACTOR=1.d-5)
-      parameter(DO_FACTOR=1.5)
+      parameter(DO_FACTOR=1.d-5)
+      !parameter(DO_FACTOR=1.5)
       character(len=100) :: cube1,cube2
       save record,atom,atmname,rootname
       save atom_number,atom_index
@@ -126,7 +126,6 @@ c     get filenames from command line
                 delta_fdist(1)=delta_fdist(1)-dble(nint(delta_fdist(1)))
                 delta_fdist(2)=delta_fdist(2)-dble(nint(delta_fdist(2)))
                 delta_fdist(3)=delta_fdist(3)-dble(nint(delta_fdist(3)))
-
                 ! compute cartesian
                 dist=0.d0
                 do i_dim=1, 3
@@ -685,19 +684,31 @@ c***********************************************************************
      &   atom_pos(i_atom,i_dim) - c(i_dim)
         end do
        end if
-
-       atom_pos_frac(i_atom,1) = 
+       atom_pos_frac(i_atom,1) = mod( 
      &atom_pos(i_atom,1)*recip_box_vector(1,1) + 
-     &atom_pos(i_atom,2)*recip_box_vector(2,1) + 
-     &atom_pos(i_atom,3)*recip_box_vector(3,1)
-       atom_pos_frac(i_atom,2) = 
-     &atom_pos(i_atom,1)*recip_box_vector(1,2) + 
+     &atom_pos(i_atom,2)*recip_box_vector(1,2) + 
+     &atom_pos(i_atom,3)*recip_box_vector(1,3),1.d0)
+       atom_pos_frac(i_atom,2) = mod(
+     &atom_pos(i_atom,1)*recip_box_vector(2,1) + 
      &atom_pos(i_atom,2)*recip_box_vector(2,2) + 
-     &atom_pos(i_atom,3)*recip_box_vector(3,2)
-       atom_pos_frac(i_atom,3) = 
-     &atom_pos(i_atom,1)*recip_box_vector(1,3) + 
-     &atom_pos(i_atom,2)*recip_box_vector(2,3) + 
-     &atom_pos(i_atom,3)*recip_box_vector(3,3)
+     &atom_pos(i_atom,3)*recip_box_vector(2,3),1.d0)
+       atom_pos_frac(i_atom,3) = mod(
+     &atom_pos(i_atom,1)*recip_box_vector(3,1) + 
+     &atom_pos(i_atom,2)*recip_box_vector(3,2) + 
+     &atom_pos(i_atom,3)*recip_box_vector(3,3),1.d0)
+
+c       atom_pos_frac(i_atom,1) = mod( 
+c     &atom_pos(i_atom,1)*recip_box_vector(1,1) + 
+c     &atom_pos(i_atom,2)*recip_box_vector(2,1) + 
+c     &atom_pos(i_atom,3)*recip_box_vector(3,1),1.d0)
+c       atom_pos_frac(i_atom,2) = mod(
+c     &atom_pos(i_atom,1)*recip_box_vector(1,2) + 
+c     &atom_pos(i_atom,2)*recip_box_vector(2,2) + 
+c     &atom_pos(i_atom,3)*recip_box_vector(3,2),1.d0)
+c       atom_pos_frac(i_atom,3) = mod(
+c     &atom_pos(i_atom,1)*recip_box_vector(1,3) + 
+c     &atom_pos(i_atom,2)*recip_box_vector(2,3) + 
+c     &atom_pos(i_atom,3)*recip_box_vector(3,3),1.d0)
       end do
 
       end subroutine
